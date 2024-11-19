@@ -104,70 +104,61 @@ class DockerAPI:
         self._interval: int = config[CONF_SCAN_INTERVAL].seconds
 
     async def init(self, startCount=0):
-        try:
-            # Try to fix unix:// to unix:/// (3 are required by aiodocker)
-            url: str = self._config[CONF_URL]
-            if (
-                url is not None
-                and url.find("unix://") == 0
-                and url.find("unix:///") == -1
-            ):
-                url = url.replace("unix://", "unix:///")
+        # Try to fix unix:// to unix:/// (3 are required by aiodocker)
+        url: str = self._config[CONF_URL]
+        if (
+            url is not None
+            and url.find("unix://") == 0
+            and url.find("unix:///") == -1
+        ):
+            url = url.replace("unix://", "unix:///")
 
-            # When we reconnect with tcp, we should delay - docker is maybe not fully ready
-            if startCount > 0 and url is not None and url.find("unix:") != 0:
-                await asyncio.sleep(5)
+        # When we reconnect with tcp, we should delay - docker is maybe not fully ready
+        if startCount > 0 and url is not None and url.find("unix:") != 0:
+            await asyncio.sleep(5)
 
-            # Do some debugging logging for TCP/TLS
-            if url is not None:
-                _LOGGER.debug("%s: Docker URL is '%s'", self._instance, url)
+        # Do some debugging logging for TCP/TLS
+        if url is not None:
+            _LOGGER.debug("%s: Docker URL is '%s'", self._instance, url)
 
-                # Check for TLS if it is not unix
-                if url.find("tcp:") == 0 or url.find("http:") == 0:
-                    tlsverify = os.environ.get("DOCKER_TLS_VERIFY", None)
-                    certpath = os.environ.get("DOCKER_CERT_PATH", None)
-                    if tlsverify is None:
-                        _LOGGER.debug(
-                            "[%s]: Docker environment 'DOCKER_TLS_VERIFY' is NOT set",
-                            self._instance,
-                        )
-                    else:
-                        _LOGGER.debug(
-                            "[%s]: Docker environment set 'DOCKER_TLS_VERIFY=%s'",
-                            self._instance,
-                            tlsverify,
-                        )
+            # Check for TLS if it is not unix
+            if url.find("tcp:") == 0 or url.find("http:") == 0:
+                tlsverify = os.environ.get("DOCKER_TLS_VERIFY", None)
+                certpath = os.environ.get("DOCKER_CERT_PATH", None)
+                if tlsverify is None:
+                    _LOGGER.debug(
+                        "[%s]: Docker environment 'DOCKER_TLS_VERIFY' is NOT set",
+                        self._instance,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "[%s]: Docker environment set 'DOCKER_TLS_VERIFY=%s'",
+                        self._instance,
+                        tlsverify,
+                    )
 
-                    if certpath is None:
-                        _LOGGER.debug(
-                            "[%s]: Docker environment 'DOCKER_CERT_PATH' is NOT set",
-                            self._instance,
-                        )
-                    else:
-                        _LOGGER.debug(
-                            "[%s]: Docker environment set 'DOCKER_CERT_PATH=%s'",
-                            self._instance,
-                            certpath,
-                        )
+                if certpath is None:
+                    _LOGGER.debug(
+                        "[%s]: Docker environment 'DOCKER_CERT_PATH' is NOT set",
+                        self._instance,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "[%s]: Docker environment set 'DOCKER_CERT_PATH=%s'",
+                        self._instance,
+                        certpath,
+                    )
 
-                    if self._config[CONF_CERTPATH]:
-                        _LOGGER.debug(
-                            "[%s]: Docker CertPath set '%s', setting environment variables DOCKER_TLS_VERIFY/DOCKER_CERT_PATH",
-                            self._instance,
-                            self._config[CONF_CERTPATH],
-                        )
-                        os.environ["DOCKER_TLS_VERIFY"] = "1"
-                        os.environ["DOCKER_CERT_PATH"] = self._config[CONF_CERTPATH]
+                if self._config[CONF_CERTPATH]:
+                    _LOGGER.debug(
+                        "[%s]: Docker CertPath set '%s', setting environment variables DOCKER_TLS_VERIFY/DOCKER_CERT_PATH",
+                        self._instance,
+                        self._config[CONF_CERTPATH],
+                    )
+                    os.environ["DOCKER_TLS_VERIFY"] = "1"
+                    os.environ["DOCKER_CERT_PATH"] = self._config[CONF_CERTPATH]
 
-            self._api = aiodocker.Docker(url=url)
-        except Exception as err:
-            _LOGGER.error(
-                "[%s]: Can not connect to Docker API (%s)",
-                self._instance,
-                str(err),
-                exc_info=True,
-            )
-            return
+        self._api = aiodocker.Docker(url=url)
 
         versionInfo = await self._api.version()
         version: str | None = versionInfo.get("Version", None)
