@@ -17,8 +17,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import slugify
 
+from custom_components.monitor_docker import MONITOR_DOCKER_KEY
+
 from .const import (
-    API,
     ATTR_MEMORY_LIMIT,
     ATTR_ONLINE_CPUS,
     ATTR_VERSION_ARCH,
@@ -31,7 +32,6 @@ from .const import (
     CONF_RENAME,
     CONF_RENAME_ENITITY,
     CONF_SENSORNAME,
-    CONFIG,
     CONTAINER,
     CONTAINER_INFO_ALLINONE,
     CONTAINER_INFO_HEALTH,
@@ -44,7 +44,6 @@ from .const import (
     CONTAINER_MONITOR_NETWORK_LIST,
     DOCKER_INFO_VERSION,
     DOCKER_MONITOR_LIST,
-    DOMAIN,
 )
 from .helpers import DockerAPI, DockerContainerAPI
 
@@ -71,8 +70,8 @@ async def async_setup_platform(
 
     instance: str = discovery_info[CONF_NAME]
     name: str = discovery_info[CONF_NAME]
-    api: DockerAPI = hass.data[DOMAIN][name][API]
-    config: ConfigType = hass.data[DOMAIN][name][CONFIG]
+    api: DockerAPI = hass.data[MONITOR_DOCKER_KEY][name].api
+    config: ConfigType = hass.data[MONITOR_DOCKER_KEY][name].config
 
     # Set or overrule prefix
     prefix = name
@@ -423,7 +422,7 @@ class DockerContainerSensor(SensorEntity):
                 stats = self._container.get_stats()
 
         except Exception as err:
-            _LOGGER.error(
+            _LOGGER.exception(
                 "[%s] %s: Cannot request container info (%s)",
                 self._instance,
                 self._cname,
@@ -473,7 +472,7 @@ class DockerContainerSensor(SensorEntity):
             try:
                 self.schedule_update_ha_state()
             except Exception as err:
-                _LOGGER.error(
+                _LOGGER.exception(
                     "[%s] %s: Failed 'schedule_update_ha_state' (%s)",
                     self._instance,
                     self._cname,

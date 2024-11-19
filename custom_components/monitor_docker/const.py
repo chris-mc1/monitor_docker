@@ -8,8 +8,6 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE, UnitOfDataRate, UnitOfInformation
 
 DOMAIN = "monitor_docker"
-API = "api"
-CONFIG = "config"
 CONTAINER = "container"
 
 CONF_CERTPATH = "certpath"

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 import voluptuous as vol
+from custom_components.monitor_docker import MONITOR_DOCKER_KEY
 from custom_components.monitor_docker.helpers import DockerAPI, DockerContainerAPI
 from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
 from homeassistant.const import CONF_NAME
@@ -17,7 +18,6 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import slugify
 
 from .const import (
-    API,
     ATTR_NAME,
     ATTR_SERVER,
     CONF_CONTAINERS,
@@ -27,7 +27,6 @@ from .const import (
     CONF_RENAME_ENITITY,
     CONF_SWITCHENABLED,
     CONF_SWITCHNAME,
-    CONFIG,
     CONTAINER,
     CONTAINER_INFO_STATE,
     DOMAIN,
@@ -53,14 +52,14 @@ async def async_setup_platform(
 
         server_name = name
         if cserver is not None:
-            if cserver not in hass.data[DOMAIN]:
+            if cserver not in hass.data[MONITOR_DOCKER_KEY]:
                 _LOGGER.error("Server '%s' is not configured", cserver)
                 return
             else:
                 server_name = cserver
 
-        server_config = hass.data[DOMAIN][server_name][CONFIG]
-        server_api = hass.data[DOMAIN][server_name][API]
+        server_config = hass.data[MONITOR_DOCKER_KEY][server_name].config
+        server_api = hass.data[MONITOR_DOCKER_KEY][server_name].api
 
         if len(server_config[CONF_CONTAINERS]) == 0:
             if server_api.get_container(cname):
@@ -94,8 +93,8 @@ async def async_setup_platform(
 
     instance: str = discovery_info[CONF_NAME]
     name: str = discovery_info[CONF_NAME]
-    api: DockerAPI = hass.data[DOMAIN][name][API]
-    config: ConfigType = hass.data[DOMAIN][name][CONFIG]
+    api: DockerAPI = hass.data[MONITOR_DOCKER_KEY][name].api
+    config: ConfigType = hass.data[MONITOR_DOCKER_KEY][name].config
 
     # Set or overrule prefix
     prefix = name
@@ -250,7 +249,7 @@ class DockerContainerSwitch(SwitchEntity):
         try:
             info = self._container.get_info()
         except Exception as err:
-            _LOGGER.error(
+            _LOGGER.exception(
                 "[%s] %s: Cannot request container info (%s)",
                 self._instance,
                 name,

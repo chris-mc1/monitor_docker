@@ -1,6 +1,7 @@
 """Monitor Docker main component."""
 
 import asyncio
+from dataclasses import dataclass
 import logging
 from datetime import timedelta
 
@@ -15,9 +16,9 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.reload import async_setup_reload_service
+from homeassistant.util.hass_dict import HassEntryKey
 
 from .const import (
-    API,
     CONF_CERTPATH,
     CONF_CONTAINERS,
     CONF_CONTAINERS_EXCLUDE,
@@ -36,7 +37,6 @@ from .const import (
     CONF_SWITCHNAME,
     CONF_BUTTONENABLED,
     CONF_BUTTONNAME,
-    CONFIG,
     CONTAINER_INFO_ALLINONE,
     DEFAULT_NAME,
     DEFAULT_RETRY,
@@ -94,16 +94,22 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
+@dataclass
+class MonitorDockerData:
+    config: ConfigType
+    api: DockerAPI = None
+
+MONITOR_DOCKER_KEY: HassEntryKey["MonitorDockerData"] = HassEntryKey(DOMAIN)
+
+
 #################################################################
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Will setup the Monitor Docker platform."""
-
     async def RunDocker(hass: HomeAssistant, entry: ConfigType) -> None:
         """Wrapper around function for a separated thread."""
 
         # Create docker instance, it will have asyncio threads
-        hass.data[DOMAIN][entry[CONF_NAME]] = {}
-        hass.data[DOMAIN][entry[CONF_NAME]][CONFIG] = entry
+        hass.data[MONITOR_DOCKER_KEY][entry[CONF_NAME]] = MonitorDockerData(config=entry)
 
         startCount = 0
 
@@ -111,14 +117,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             doLoop = True
 
             try:
-                hass.data[DOMAIN][entry[CONF_NAME]][API] = DockerAPI(hass, entry)
-                await hass.data[DOMAIN][entry[CONF_NAME]][API].init(startCount)
+                hass.data[MONITOR_DOCKER_KEY][entry[CONF_NAME]
+                                  ].api= DockerAPI(hass, entry)
+                await hass.data[MONITOR_DOCKER_KEY][entry[CONF_NAME]].api.init(startCount)
             except Exception as err:
                 doLoop = False
                 if entry[CONF_RETRY] == 0:
                     raise
                 else:
-                    _LOGGER.error("Failed Docker connect: %s", str(err))
+                    _LOGGER.exception("Failed Docker connect: %s", str(err))
                     _LOGGER.error("Retry in %d seconds", entry[CONF_RETRY])
                     await asyncio.sleep(entry[CONF_RETRY])
 
@@ -129,7 +136,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 # loop.run_forever()
 
                 # We only get here if a docker instance disconnected or HASS is stopping
-                if not hass.data[DOMAIN][entry[CONF_NAME]][API]._dockerStopped:
+                if not hass.data[MONITOR_DOCKER_KEY][entry[CONF_NAME]].api._dockerStopped:
                     # If HASS stopped, do not retry
                     break
 
@@ -137,7 +144,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # await async_setup_reload_service(hass, DOMAIN, [DOMAIN])
 
     # Create domain monitor_docker data variable
-    hass.data[DOMAIN] = {}
+    hass.data.setdefault(MONITOR_DOCKER_KEY, {})
 
     # Now go through all possible entries, we support 1 or more docker hosts (untested)
     for entry in config[DOMAIN]:
@@ -158,7 +165,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 [CONTAINER_INFO_ALLINONE]
             )
 
-        if entry[CONF_NAME] in hass.data[DOMAIN]:
+        if entry[CONF_NAME] in hass.data[MONITOR_DOCKER_KEY]:
             _LOGGER.error(
                 "Instance %s is duplicate, please assign an unique name",
                 entry[CONF_NAME],
